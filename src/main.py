@@ -37,8 +37,11 @@ if __name__ == "__main__":
 
     # 3. Простой поиск
     print("\nПростой поиск:")
-    result_simple_search = simple_search("Фастфуд", transactions)
-    print(result_simple_search)
+    try:
+        result_simple_search = simple_search("Фастфуд", transactions)
+        print(result_simple_search)
+    except Exception as e:
+        logging.error(f"Ошибка при выполнении простого поиска: {e}")
 
     # 4. Поиск по телефонным номерам
     print("\nПоиск по телефонным номерам:")

@@ -54,34 +54,33 @@ def filter_events_by_month(dataframe) -> list:
     return events
 
 
-import os
 import pandas as pd
 from datetime import datetime
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
 def read_excel_file(file_name: str) -> pd.DataFrame:
     """
-    Читает Excel-файл с транзакциями и возвращает DataFrame.
+    Чтение Excel-файла с транзакциями.
 
-    :param file_name: Название файла (например, "operations.xlsx").
+    :param file_name: Название файла.
     :return: DataFrame с данными.
     """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(current_dir, "..", "data", file_name)
-
-    if not os.path.exists(file_path):
-        print(f"Файл {file_path} не найден.")
-        return pd.DataFrame()  # Возвращаем пустой DataFrame
-
     try:
-        # Чтение файла
-        df = pd.read_excel(file_path)
+        df = pd.read_excel(file_name)
 
-        # Преобразование даты операции в формат datetime
-        df['Дата операции'] = pd.to_datetime(df['Дата операции'], format='%d.%m.%Y %H:%M:%S', errors='coerce')
+        # Проверка наличия необходимых столбцов
+        required_columns = ["Дата операции", "Статус", "Сумма операции", "Категория", "Описание"]
+        if not all(col in df.columns for col in required_columns):
+            raise KeyError(f"Отсутствуют необходимые столбцы: {required_columns}")
 
-        print(f"Файл {file_path} успешно прочитан.")
+        # Преобразование даты в формат datetime
+        df["Дата операции"] = pd.to_datetime(df["Дата операции"], format='%d.%m.%Y %H:%M:%S', errors='coerce')
+
+        logging.info(f"Файл {file_name} успешно прочитан.")
         return df
 
     except Exception as e:
-        print(f"Ошибка при чтении файла {file_path}: {e}")
-        return pd.DataFrame()  # Возвращаем пустой DataFrame
+        logging.error(f"Ошибка при чтении файла {file_name}: {e}")
+        return pd.DataFrame()

@@ -1,12 +1,8 @@
-# src/services.py
-
 import json
 import logging
 from collections import defaultdict
 from datetime import datetime
 from typing import List, Dict
-
-import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -55,13 +51,13 @@ def profitable_categories(transactions: List[Dict], year: int, month: int) -> st
 
 # Сервис «Инвесткопилка»
 
-def investment_piggy_bank(transactions: List[Dict], month: int, rounding_limit: int) -> str:
+def investment_piggy_bank(transactions: list, month: int, rounding_limit: int) -> str:
     """
-    Расчитывает сумму для инвесткопилки через округление трат.
+    Расчет суммы для инвесткопилки через округление трат.
 
     :param transactions: Список словарей с транзакциями.
     :param month: Месяц для анализа.
-    :param rounding_limit: Лимит округления.
+    :param rounding_limit: Лимит округления (например, 50 или 100).
     :return: JSON-ответ с рассчитанной суммой.
     """
     try:
@@ -72,10 +68,10 @@ def investment_piggy_bank(transactions: List[Dict], month: int, rounding_limit: 
             t for t in transactions
             if "Дата операции" in t and isinstance(t["Дата операции"], datetime) and
                t["Дата операции"].year == current_year and
-               t["Дата операции"].month == month
+               t["Дата операции"].month == month and
+               float(t["Сумма операции"]) < 0  # Только расходы
         ]
 
-        # Расчет разницы между фактической суммой и округленной
         def calculate_rounding_difference(amount: float) -> float:
             rounded_amount = ((abs(amount) // rounding_limit) + 1) * rounding_limit
             return rounded_amount - abs(amount)
@@ -83,7 +79,6 @@ def investment_piggy_bank(transactions: List[Dict], month: int, rounding_limit: 
         total_investment = sum(
             calculate_rounding_difference(float(t["Сумма операции"]))
             for t in filtered_transactions
-            if "Сумма операции" in t and float(t["Сумма операции"]) < 0
         )
 
         return json.dumps({"total_investment": total_investment}, ensure_ascii=False, indent=4)
@@ -92,34 +87,32 @@ def investment_piggy_bank(transactions: List[Dict], month: int, rounding_limit: 
         logging.error(f"Ошибка при расчете инвесткопилки: {e}")
         return json.dumps({"error": "Internal server error"}, ensure_ascii=False, indent=4)
 
+
 # Сервис «Простой поиск»
 
 def simple_search(query: str, transactions: List[Dict]) -> str:
     """
-    Выполняет простой поиск среди транзакций.
+    Выполняет простой поиск среди описаний и категорий транзакций.
 
-    :param query: Строка запроса.
+    :param query: Строка запроса для поиска.
     :param transactions: Список словарей с транзакциями.
     :return: JSON-ответ со списком найденных транзакций.
     """
-    try:
-        # Проверяем наличие текстовых полей (Описание, Категория)
-        search_results = [
-            t for t in transactions
-            if ("Описание" in t and query.lower() in t["Описание"].lower()) or
-               ("Категория" in t and query.lower() in t["Категория"].lower())
-        ]
+    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    search_results = [
+        {key: value.isoformat() if isinstance(value, datetime) else value for key, value in t.items()}
+        for t in transactions
+        if ("Описание" in t and pattern.search(str(t["Описание"]))) or
+           ("Категория" in t and pattern.search(str(t["Категория"])))
+    ]
 
-        return json.dumps({"results": search_results}, ensure_ascii=False, indent=4)
-
-    except Exception as e:
-        logging.error(f"Ошибка при выполнении простого поиска: {e}")
-        return json.dumps({"error": "Internal server error"}, ensure_ascii=False, indent=4)
+    return json.dumps({"results": search_results}, ensure_ascii=False, indent=4)
 
 
 # Сервис «Поиск по телефонным номерам»
 
 import re
+
 
 def find_phone_numbers(transactions: List[Dict]) -> str:
     """
@@ -128,46 +121,25 @@ def find_phone_numbers(transactions: List[Dict]) -> str:
     :param transactions: Список словарей с транзакциями.
     :return: JSON-ответ со списком найденных транзакций.
     """
-    try:
-        # Регулярное выражение для поиска телефонных номеров
-        phone_pattern = re.compile(r"\+7\s?\d{3}\s?\d{2}-\d{2}-\d{2}", re.IGNORECASE)
+    phone_pattern = re.compile(r"\+7\s?\d{3}\s?\d{2}-\d{2}-\d{2}", re.IGNORECASE)
+    phone_results = [
+        {key: value.isoformat() if isinstance(value, datetime) else value for key, value in t.items()}
+        for t in transactions
+        if "Описание" in t and phone_pattern.search(str(t["Описание"]))
+    ]
 
-        # Поиск транзакций с телефонными номерами
-        phone_results = [
-            {key: (value.isoformat() if isinstance(value, pd.Timestamp) else value)
-             for key, value in t.items()}
-            for t in transactions if "Описание" in t and phone_pattern.search(t["Описание"])
-        ]
+    return json.dumps({"results": phone_results}, ensure_ascii=False, indent=4)
 
-        return json.dumps({"results": phone_results}, ensure_ascii=False, indent=4)
-
-    except Exception as e:
-        logging.error(f"Ошибка при поиске телефонных номеров: {e}")
-        return json.dumps({"error": "Internal server error"}, ensure_ascii=False, indent=4)
 
 # Сервис «Поиск переводов физическим лицам»
 
-def find_physical_transfers(transactions: List[Dict]) -> str:
-    """
-    Находит переводы физическим лицам.
+def find_physical_transfers(transactions: list) -> str:
+    physical_transfer_pattern = re.compile(r"^[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.$|[А-ЯЁ][а-яё]+\s[А-ЯЁ][а-яё]+$", re.IGNORECASE)
+    transfer_results = [
+        {key: value.isoformat() if isinstance(value, datetime) else value
+         for key, value in t.items()}
+        for t in transactions if "Категория" in t and t["Категория"] == "Переводы" and
+                                 "Описание" in t and physical_transfer_pattern.match(str(t["Описание"]).strip())
+    ]
 
-    :param transactions: Список словарей с транзакциями.
-    :return: JSON-ответ со списком найденных транзакций.
-    """
-    try:
-        # Регулярное выражение для поиска имени и первой буквы фамилии
-        physical_transfer_pattern = re.compile(r"^[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.$", re.IGNORECASE)
-
-        # Поиск переводов физлицам
-        transfer_results = [
-            {key: (value.isoformat() if isinstance(value, pd.Timestamp) else value)
-             for key, value in t.items()}
-            for t in transactions if "Категория" in t and t["Категория"] == "Переводы" and
-                                  "Описание" in t and physical_transfer_pattern.match(t["Описание"].strip())
-        ]
-
-        return json.dumps({"results": transfer_results}, ensure_ascii=False, indent=4)
-
-    except Exception as e:
-        logging.error(f"Ошибка при поиске переводов физическим лицам: {e}")
-        return json.dumps({"error": "Internal server error"}, ensure_ascii=False, indent=4)
+    return json.dumps({"results": transfer_results}, ensure_ascii=False, indent=4)

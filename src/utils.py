@@ -1,86 +1,65 @@
 import logging
-from datetime import datetime
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-
-def filter_transactions_by_date(target_date: datetime) -> list:
-    """
-    Фильтрует транзакции по заданной дате.
-
-    :param target_date: Дата для фильтрации.
-    :return: Список словарей с транзакциями.
-    """
-    # Загружаем данные из Excel (например, operations.xlsx)
-    df = pd.read_excel("data/operations.xlsx")
-
-    # Преобразуем столбец 'date' в формат datetime
-    df['date'] = pd.to_datetime(df['date'])
-
-    # Фильтруем транзакции по дате
-    filtered_df = df[df['date'].dt.date == target_date.date()]
-
-    # Преобразуем DataFrame в список словарей
-    transactions = filtered_df.to_dict(orient="records")
-
-    logging.info(f"Filtered {len(transactions)} transactions by date {target_date.date()}")
-    return transactions
-
-
-def filter_events_by_month(dataframe) -> list:
-    """
-    Фильтрует события по текущему месяцу.
-
-    :param dataframe: DataFrame с транзакциями.
-    :return: Список словарей с событиями.
-    """
-    current_month = datetime.now().month
-    current_year = datetime.now().year
-
-    # Фильтруем транзакции по текущему месяцу
-    filtered_df = dataframe[
-        (dataframe['date'].dt.month == current_month) &
-        (dataframe['date'].dt.year == current_year)
-        ]
-
-    # Преобразуем DataFrame в список словарей
-    events = filtered_df.to_dict(orient="records")
-
-    logging.info(f"Filtered {len(events)} events for month {current_month}/{current_year}")
-    return events
-
+import os
 
 import pandas as pd
-from datetime import datetime
+import requests
+from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
 
-def read_excel_file(file_name: str) -> pd.DataFrame:
+def load_transactions(file_path="data/operations.xlsx"):  # Было "transactions.xlsx"
     """
-    Чтение Excel-файла с транзакциями.
+    Загружает транзакции из Excel-файла.
 
-    :param file_name: Название файла.
-    :return: DataFrame с данными.
+    Args:
+        file_path (str): Путь к Excel-файлу с транзакциями.
+
+    Returns:
+        List[Dict]: Список транзакций в формате словарей или пустой список при ошибке.
     """
     try:
-        df = pd.read_excel(file_name)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Файл {file_path} не найден")
 
-        # Проверка наличия необходимых столбцов
-        required_columns = ["Дата операции", "Статус", "Сумма операции", "Категория", "Описание"]
-        if not all(col in df.columns for col in required_columns):
-            raise KeyError(f"Отсутствуют необходимые столбцы: {required_columns}")
-
-        # Преобразование даты в формат datetime
-        df["Дата операции"] = pd.to_datetime(df["Дата операции"], format='%d.%m.%Y %H:%M:%S', errors='coerce')
-
-        logging.info(f"Файл {file_name} успешно прочитан.")
-        return df
-
+        df = pd.read_excel(file_path)
+        return df.to_dict(orient='records')
     except Exception as e:
-        logging.error(f"Ошибка при чтении файла {file_name}: {e}")
-        return pd.DataFrame()
+        logging.error(f"Error loading transactions: {e}")
+        return []
+
+
+def get_exchange_rates():
+    """
+    Получает текущие курсы валют через Exchange Rate API.
+
+    Returns:
+        Dict: Курсы валют относительно USD или пустой словарь при ошибке.
+    """
+    url = f"https://v6.exchangerate-api.com/v6/{os.getenv('EXCHANGE_RATE_API_KEY')}/latest/USD"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()['conversion_rates']
+    except Exception as e:
+        logging.error(f"Exchange rate API error: {e}")
+        return {}
+
+
+def get_sp500_data():
+    """
+    Получает данные о S&P 500 через Alpha Vantage API.
+
+    Returns:
+        List[Dict]: Последние 5 записей о S&P 500 или пустой список при ошибке.
+    """
+    url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=SPX&apikey=demo"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return list(data.get('Time Series Daily Adjusted', {}).values())[:5]
+    except Exception as e:
+        logging.error(f"S&P 500 API error: {e}")
+        return []

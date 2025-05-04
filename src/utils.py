@@ -9,7 +9,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 
-def load_transactions(file_path="data/operations.xlsx"):  # Было "transactions.xlsx"
+def load_transactions(file_path=None):
     """
     Загружает транзакции из Excel-файла.
 
@@ -19,6 +19,11 @@ def load_transactions(file_path="data/operations.xlsx"):  # Было "transactio
     Returns:
         List[Dict]: Список транзакций в формате словарей или пустой список при ошибке.
     """
+
+    if not file_path:
+        file_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(file_dir, "..", "data", "operations.xlsx")
+
     try:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Файл {file_path} не найден")

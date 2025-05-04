@@ -1,45 +1,50 @@
-from datetime import datetime
-
 import pandas as pd
 
+import utils
+import services
+import reports
+from datetime import datetime
+import json
 
-def get_homepage_data(date_time_str: str, file_path: str) -> dict:
-    """
-    Возвращает данные для страницы «Главная» за указанную дату.
 
-    :param date_time_str: Дата в формате YYYY-MM-DD.
-    :param file_path: Путь к Excel-файлу.
-    :return: JSON-ответ с данными для главной страницы.
-    """
+def main_views():
+    """Основная функция для запуска анализа транзакций."""
+
+    print("=== Загрузка транзакций из Excel-файла ===")
+    transactions = utils.load_transactions()
+    print(f"Загружено {len(transactions)} транзакций")
+    print(json.dumps(transactions[:2], indent=2, ensure_ascii=False))  # Пример первых 2 транзакций
+
+    print("\n=== Получение курсов валют ===")
+    exchange_rates = utils.get_exchange_rates()
+    print(f"Курсы валют (USD): {json.dumps(exchange_rates, indent=2, ensure_ascii=False)}")
+
+    print("\n=== Получение данных о S&P 500 ===")
+    sp500_data = utils.get_sp500_data()
+    print(f"S&P 500: {json.dumps(sp500_data, indent=2, ensure_ascii=False)}")
+
+    print("\n=== Фильтрация транзакций по дате ===")
+    date_str = input("Введите дату фильтрации (YYYY-MM-DD HH:MM:SS): ")
     try:
-        # Чтение файла
-        df = pd.read_excel(file_path)
+        target_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+        filtered = [t for t in transactions if
+                    datetime.strptime(t['Дата операции'], "%d.%m.%Y %H:%M:%S") <= target_date]
+        print(f"Найдено {len(filtered)} транзакций до {date_str}")
+        print(json.dumps(filtered[:2], indent=2, ensure_ascii=False))  # Пример первых 2 транзакций
+    except ValueError:
+        print("Ошибка: Неверный формат даты")
 
-        # Вывод названий столбцов для диагностики
-        print("Названия столбцов:", df.columns.tolist())
+    print("\n=== Поиск транзакций ===")
+    search_query = input("Введите строку для поиска: ")
+    search_result = services.search_transactions(search_query, transactions)
+    print(f"Результаты поиска для '{search_query}': {search_result}")
 
-        # Преобразование строки даты в объект datetime
-        target_date = datetime.strptime(date_time_str, "%Y-%m-%d").date()
+    print("\n=== Отчет по дням недели ===")
+    date_filter = input("Введите дату для фильтрации отчета (YYYY-MM-DD, Enter для пропуска): ")
+    df = pd.DataFrame(transactions)
+    weekday_report = reports.spending_by_weekday(df, date_filter or None)
+    print(f"Расходы по дням недели: {weekday_report}")
 
-        # Проверка наличия столбца "Дата операции"
-        if "Дата операции" not in df.columns:
-            raise KeyError(f"Столбец 'Дата операции' отсутствует в файле {file_path}")
 
-        # Преобразование столбца "Дата операции" в формат datetime
-        df['Дата операции'] = pd.to_datetime(df['Дата операции'], format='%d.%m.%Y %H:%M:%S', errors='coerce')
-
-        # Фильтрация по дате
-        filtered_df = df[df['Дата операции'].dt.date == target_date]
-
-        # Подготовка данных для JSON
-        response_data = {
-            "date": date_time_str,
-            "transactions_count": len(filtered_df),
-            "total_amount": filtered_df["Сумма операции"].sum()
-        }
-
-        return response_data
-
-    except Exception as e:
-        print(f"Ошибка при чтении Excel-файла: {e}")
-        return {"error": str(e)}
+if __name__ == "__main__":
+    main_views()

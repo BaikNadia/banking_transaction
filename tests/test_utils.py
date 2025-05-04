@@ -99,26 +99,3 @@ def test_get_sp500_data_empty_response(mock_get):
     result = utils.get_sp500_data()
     assert result == []
 
-# # Параметризованные тесты
-# @pytest.mark.parametrize("file_path,expected_result", [
-#     ("data/operations.xlsx", 1),
-#     ("data/nonexistent.xlsx", 0),
-# ])
-# @patch('src.utils.pd.read_excel')
-# def test_load_transactions_parametrized(mock_read_excel, file_path, expected_result):
-#     """Параметризованный тест загрузки транзакций"""
-#     if "nonexistent" in file_path:
-#         result = utils.load_transactions(file_path)
-#         assert result == []
-#     else:
-#         mock_df = pd.DataFrame([
-#             {
-#                 "Дата операции": "02.06.2019 17:46:06",
-#                 "Сумма операции": -87,
-#                 "Категория": "Супермаркеты"
-#             }
-#         ])
-#         mock_read_excel.return_value = mock_df
-#         result = utils.load_transactions(file_path)
-#         assert len(result) == 1
-#         assert result[0]["Категория"] == "Супермаркеты"

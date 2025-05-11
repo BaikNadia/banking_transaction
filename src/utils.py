@@ -52,19 +52,43 @@ def get_exchange_rates():
         return {}
 
 
+# def get_sp500_data():
+#     """
+#     Получает данные о S&P 500 через Alpha Vantage API.
+
+#    Returns:
+#        List[Dict]: Последние 5 записей о S&P 500 или пустой список при ошибке.
+#    """
+#    url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=SPX&apikey=demo"
+#    try:
+#        response = requests.get(url)
+#        response.raise_for_status()
+#        data = response.json()
+#        return list(data.get('Time Series Daily Adjusted', {}).values())[:5]
+#    except Exception as e:
+#        logging.error(f"S&P 500 API error: {e}")
+#        return []
+
 def get_sp500_data():
     """
     Получает данные о S&P 500 через Alpha Vantage API.
 
     Returns:
-        List[Dict]: Последние 5 записей о S&P 500 или пустой список при ошибке.
+        List[Dict]: Последние 5 записей о S&P 500 или пустой список при ошибке
     """
-    url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=SPX&apikey=demo"
+    url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=SPX&apikey=demo "
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return list(data.get('Time Series Daily Adjusted', {}).values())[:5]
+
+        # Проверяем, есть ли нужные данные
+        time_series = data.get('Time Series Daily Adjusted', {})
+        if not time_series:
+            logging.warning("Нет данных о S&P 500")
+            return []
+
+        return list(time_series.values())[:5]
     except Exception as e:
         logging.error(f"S&P 500 API error: {e}")
         return []
